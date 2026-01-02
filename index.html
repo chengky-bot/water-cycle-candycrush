@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>水循環大挑戰 Water Cycle Crush</title>
+    <style>
+        :root {
+            --bg-color: #E1F5FE;
+            --card-bg: #ffffff;
+            --primary-color: #4FC3F7;
+            --secondary-color: #F48FB1;
+            --text-color: #455A64;
+            --grid-gap: 5px;
+            --correct-color: #4CAF50;
+            --wrong-color: #F44336;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #E1F5FE 0%, #FCE4EC 100%);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-color);
+            overflow: hidden;
+            touch-action: none; /* 防止滑動時觸發瀏覽器動作 */
+        }
+
+        #app {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 95vw;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+
+        header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 8px 15px;
+            border-radius: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #90A4AE;
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            color: var(--primary-color);
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: var(--grid-gap);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 10px;
+            border-radius: 15px;
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        .cell {
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(1.2rem, 5vw, 2rem);
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.2s, background-color 0.2s;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cell:active {
+            transform: scale(0.9);
+        }
+
+        .cell.selected {
+            background-color: var(--primary-color);
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        .cell.matched {
+            animation: popOut 0.3s forwards;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes popOut {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            width: 85%;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: slideUp 0.3s ease-out;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        h2 {
+            margin: 0 0 10px 0;
+            color: var(--secondary-color);
+        }
+
+        .question-text {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            font-weight: 500;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: opacity 0.3s;
+        }
+        
+        /* 鎖定選項時的樣式 */
+        .options-grid.locked {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        button.option-btn {
+            background: #f0f0f0;
+            border: 2px solid #e0e0e0;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 1rem;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        button.option-btn:hover:not(:disabled) {
+            background: #e3f2fd;
+            border-color: var(--primary-color);
+        }
+
+        button.option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        button.option-btn.correct {
+            background: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724 !important;
+        }
+
+        button.option-btn.wrong {
+            background: #f8d7da !important;
+            border-color: #dc3545 !important;
+            color: #721c24 !important;
+            animation: shake 0.4s;
+        }
+
+        #player-name-input {
+            width: 80%;
+            padding: 12px;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #player-name-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* 科學解說區域 */
+        #quiz-explanation {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #E3F2FD;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary-color);
+            text-align: left;
+            font-size: 0.95rem;
+            display: none; /* 預設隱藏 */
+            animation: fadeIn 0.5s;
+        }
+        
+        #quiz-explanation strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #1565C0;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 倒數/跳過提示 */
+        #skip-hint {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #999;
+            display: none;
+            animation: pulse-text 1.5s infinite;
+            cursor: pointer;
+        }
+        
+        @keyframes pulse-text {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        /* 回饋文字區域 */
+        #quiz-feedback {
+            margin-top: 10px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            min-height: 1.5em; 
+        }
+        .feedback-correct { color: var(--correct-color); }
+        .feedback-wrong { color: var(--wrong-color); }
+
+        .report-list {
+            text-align: left;
+            margin-top: 15px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .report-list li {
+            margin-bottom: 8px;
+            color: #555;
+            border-bottom: 1px dashed #eee;
+            padding-bottom: 4px;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        #start-btn, #restart-btn {
+            background: linear-gradient(to right, var(--primary-color), #29B6F6);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            box-shadow: 0 5px 15px rgba(79, 195, 247, 0.4);
+            transition: transform 0.2s;
+            width: 100%;
+        }
+
+        #start-btn:active, #restart-btn:active {
+            transform: scale(0.95);
+        }
+
+        .combo-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 0px #FF8F00;
+            pointer-events: none;
+            z-index: 50;
+            animation: floatUp 1s forwards;
+            display: none;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            20% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -150%); opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <header>
+            <div class="stat-box">
+                <span class="stat-label">分數</span>
+                <span class="stat-value" id="score-display">0</span>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <span style="font-size: 1.2rem; font-weight: bold; color: var(--secondary-color);">Water Cycle</span>
+                <span id="player-name-display" style="font-size: 0.8rem; color: #777;"></span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">步數</span>
+                <span class="stat-value" id="moves-display">20</span>
+            </div>
+        </header>
+
+        <div id="game-board">
+            <!-- Grid generated by JS -->
+        </div>
+
+        <div id="combo-display" class="combo-text">COMBO!</div>
+
+        <!-- Start Game Modal -->
+        <div id="start-modal" class="modal-overlay active">
+            <div class="modal-content">
+                <span class="modal-icon">👋</span>
+                <h2>歡迎來到水循環大挑戰</h2>
+                <p>請輸入你的名字開始遊戲：</p>
+                <input type="text" id="player-name-input" placeholder="例如：小明" maxlength="10">
+                <p style="font-size: 0.9rem; color: #777; margin-top: 10px;">💡 滑動糖果來消除，答對才能得分！<br>⚡ 連鎖消除直接加分</p>
+                <button id="start-btn">開始遊戲</button>
+            </div>
+        </div>
+
+        <!-- Quiz Modal -->
+        <div id="quiz-modal" class="modal-overlay">
+            <div class="modal-content">
+                <span class="modal-icon">🤔</span>
+                <h2>考考你！</h2>
+                <p id="quiz-question" class="question-text">題目載入中...</p>
+                
+                <div id="quiz-options" class="options-grid">
+                    <!-- Options generated by JS -->
+                </div>
+
+                <div id="quiz-feedback"></div>
+                
+                <!-- 科學解說區域 -->
+                <div id="quiz-explanation">
+                    <strong>📖 科學小教室：</strong>
+                    <span id="explanation-text"></span>
+                </div>
+
+                <div id="skip-hint">⏳ 請閱讀觀念 (點擊任意處跳過)</div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="modal-overlay">
+            <div class="modal-content">
+                <span class="modal-icon">🏆</span>
+                <h2 id="report-title">遊戲報告</h2>
+                
+                <div style="display: flex; justify-content: space-around; width: 100%; margin: 15px 0;">
+                    <div>
+                        <div style="font-size: 0.8rem; color: #777;">最終分數</div>
+                        <div id="final-score" style="color: var(--primary-color); font-size: 2rem; font-weight: bold;">0</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.8rem; color: #777;">答題準確度</div>
+                        <div id="final-accuracy" style="color: var(--secondary-color); font-size: 2rem; font-weight: bold;">-</div>
+                    </div>
+                </div>
+
+                <div style="text-align: left; width: 100%;">
+                    <strong style="color: #555;">📝 需要複習的觀念：</strong>
+                    <div id="review-list" class="report-list">
+                        <!-- Wrong answers list -->
+                        <div style="text-align: center; color: #999;">太棒了！這次沒有答錯的題目。</div>
+                    </div>
+                </div>
+
+                <button id="restart-btn">再玩一次</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 遊戲資料 (題目庫 - 包含科學解說) ---
+        const questions = [
+            { 
+                question: "天氣炎熱的時候，水會怎麼樣？", 
+                answer: "變成水蒸氣（蒸發）", 
+                options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成泥土"],
+                explanation: "熱能會讓水分子運動變快，掙脫水的束縛變成看不見的水蒸氣，這個過程叫做蒸發。"
+            },
+            { 
+                question: "在雲中，水是怎麼樣的？", 
+                answer: "是水蒸氣（凝結）", 
+                options: ["是水蒸氣（凝結）", "是冰塊", "是喝的水"],
+                explanation: "當水蒸氣升到高空遇冷，會凝結成小水滴或小冰晶，聚在一起就變成了雲。"
+            },
+            { 
+                question: "當雲飄到天空時，會發生什麼事？", 
+                answer: "水會降落成雨（降水）", 
+                options: ["水會降落成雨（降水）", "水會變成雪", "水會消失"],
+                explanation: "當雲裡的小水滴越聚越多，變得太重而空氣托不住時，就會掉下來形成雨，這叫降水。"
+            },
+            { 
+                question: "夏天的時候，游泳池的水會怎麼樣？", 
+                answer: "蒸發成水蒸氣", 
+                options: ["蒸發成水蒸氣", "變成冰", "變成飲料"],
+                explanation: "夏天太陽很大，熱能會加速水面蒸發，所以游泳池的水位會慢慢下降。"
+            },
+            { 
+                question: "雨水是怎麼來的？", 
+                answer: "從雲裡降落（降水）", 
+                options: ["從雲裡降落（降水）", "直接從地面", "從樹上掉下來"],
+                explanation: "雨水是雲層中的水滴變大後，受重力影響掉落下來的現象。"
+            },
+            { 
+                question: "早晨為什麼有霧？", 
+                answer: "水蒸氣凝結成小水滴", 
+                options: ["水蒸氣凝結成小水滴", "水蒸氣消失", "雲變成霧"],
+                explanation: "夜晚地面變冷，接近地面的水蒸氣遇冷凝結成懸浮的小水滴，就形成了霧。"
+            },
+            { 
+                question: "花園裡的水，當太陽出來的時候會發生什麼？", 
+                answer: "蒸發（蒸發）", 
+                options: ["蒸發（蒸發）", "變成泥土", "變成冰"],
+                explanation: "太陽的熱力會讓土壤或葉子上的水分轉變成氣體，回到空氣中。"
+            },
+            { 
+                question: "冬天下雪的時候，水是怎麼在天上形成的？", 
+                answer: "質變成雲（凝結）", 
+                options: ["質變成雲（凝結）", "變成雨", "變成水滴"],
+                explanation: "在非常冷的高空，水蒸氣會直接凝華成小冰晶，聚集後掉落就是雪。"
+            },
+            { 
+                question: "雨後天空中有彩虹，這是因為什麼？", 
+                answer: "水蒸氣在空中凝結", 
+                options: ["水蒸氣在空中凝結", "雲出現了", "水變成冰"],
+                explanation: "彩虹是因為陽光照射到空氣中殘留的小水滴，產生折射和反射形成的。"
+            },
+            { 
+                question: "植物怎麼得到水？", 
+                answer: "從土壤裡吸收水（降水）", 
+                options: ["從土壤裡吸收水（降水）", "從太陽那裡", "從風中"],
+                explanation: "雨水（降水）滲入土壤後，植物的根部會把水吸上來維持生命。"
+            },
+            { 
+                question: "熱水壺裡的水加熱後會怎麼樣？", 
+                answer: "變成水蒸氣（蒸發）", 
+                options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成飲料"],
+                explanation: "加熱提供了能量，讓水快速沸騰並大量轉變為水蒸氣。"
+            },
+            { 
+                question: "晚上，如果空氣裡的水蒸氣變冷了會怎麼樣？", 
+                answer: "形成露珠（凝結）", 
+                options: ["形成露珠（凝結）", "變成太陽", "消失"],
+                explanation: "晚上的冷空氣讓水蒸氣接觸到冰涼的草葉表面時，凝結成液態的小水珠，稱為露水。"
+            },
+            { 
+                question: "下雨的時候，水去哪裡了？", 
+                answer: "從雲裡掉下來（降水）", 
+                options: ["從雲裡掉下來（降水）", "消失了", "回到土裡"],
+                explanation: "雨水會落到地面，有的流入河流，有的滲入地下，最後再流回大海，完成循環。"
+            },
+            { 
+                question: "在夏天炎熱的城市裡，馬路上的水會怎麼樣？", 
+                answer: "渐渐蒸發（蒸發）", 
+                options: ["渐渐蒸發（蒸發）", "變成冰", "生成泥塵"],
+                explanation: "柏油路吸熱快，高溫會讓灑在路上的水非常迅速地蒸發掉。"
+            },
+            { 
+                question: "水蒸氣在空中會怎麼形成雲？", 
+                answer: "因為變冷凝結", 
+                options: ["因為變冷凝結", "因為變熱", "因為下雨"],
+                explanation: "高空溫度比地面低，熱空氣上升後變冷，水蒸氣就會凝結成雲。"
+            },
+            { 
+                question: "我們從哪裡能找到雲中的水？", 
+                answer: "水蒸氣凝結", 
+                options: ["水蒸氣凝結", "河裡", "地面"],
+                explanation: "雖然雲在天上，但它其實就是由無數的小水滴或小冰晶組成的。"
+            },
+            { 
+                question: "當雲變厚，會發生什麼？", 
+                answer: "開始下雨（降水）", 
+                options: ["開始下雨（降水）", "變成白雲", "消失"],
+                explanation: "雲變厚變黑代表水滴非常密集且厚重，陽光穿不透，通常預示著快要下雨了。"
+            },
+            { 
+                question: "當水面上有水蒸氣時，我們在水裡應該注意什麼？", 
+                answer: "水會蒸發（蒸發）", 
+                options: ["水會蒸發（蒸發）", "水會變多", "水會變成冰"],
+                explanation: "水時刻都在蒸發，只是溫度越高蒸發越快，我們肉眼不一定看得到。"
+            },
+            { 
+                question: "秋天時，空氣變涼，水會發生什麼？", 
+                answer: "形成小水珠（凝結）", 
+                options: ["形成小水珠（凝結）", "消失了", "變成冰"],
+                explanation: "涼爽的空氣讓水蒸氣更容易凝結，所以秋天的早晨常能在窗戶或車上看到霧氣。"
+            },
+            { 
+                question: "天上有很多雲，會發生什麼？", 
+                answer: "有可能會下雨（降水）", 
+                options: ["有可能會下雨（降水）", "空氣變熱", "雲變得更白"],
+                explanation: "雲量多代表空氣中水氣充足，下雨的機率自然就變高了。"
+            }
+        ];
+
+        // --- 2. 遊戲設定與變數 ---
+        const width = 8;
+        const grid = document.querySelector('#game-board');
+        const scoreDisplay = document.querySelector('#score-display');
+        const movesDisplay = document.querySelector('#moves-display');
+        const playerNameDisplay = document.querySelector('#player-name-display');
+        const candyColors = ['💧', '☀️', '☁️', '❄️', '🌈', '☔']; 
+        
+        let squares = [];
+        let score = 0;
+        let moves = 20;
+        let selectedSquare = null;
+        let isProcessing = false;
+        let playerName = "學生";
+        let holdTimer = null;
+        
+        // 拖曳與滑動相關變數
+        let squareIdBeingDragged;
+        let squareIdBeingReplaced;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+        
+        // 學習報告數據
+        let wrongQuestionsSet = new Set(); 
+        let totalQuestionsAnswered = 0;
+        let firstTryCorrectCount = 0;
+
+        // --- 3. 初始化遊戲 ---
+        function initGame() {
+            const nameInput = document.getElementById('player-name-input').value.trim();
+            if (nameInput) {
+                playerName = nameInput;
+            }
+            playerNameDisplay.innerText = `玩家: ${playerName}`;
+
+            grid.innerHTML = '';
+            squares = [];
+            score = 0;
+            moves = 20;
+            wrongQuestionsSet.clear();
+            totalQuestionsAnswered = 0;
+            firstTryCorrectCount = 0;
+
+            updateStats();
+            createBoard();
+            
+            window.setTimeout(() => {
+                checkRowForThree(true);
+                checkColumnForThree(true);
+            }, 100);
+        }
+
+        function createBoard() {
+            for (let i = 0; i < width * width; i++) {
+                const square = document.createElement('div');
+                // Drag Events
+                square.setAttribute('draggable', true);
+                
+                square.setAttribute('id', i);
+                square.classList.add('cell');
+                
+                let randomColor = Math.floor(Math.random() * candyColors.length);
+                square.innerText = candyColors[randomColor];
+                square.setAttribute('data-type', candyColors[randomColor]);
+                
+                grid.appendChild(square);
+                squares.push(square);
+
+                // Mouse Drag Events
+                square.addEventListener('dragstart', dragStart);
+                square.addEventListener('dragend', dragEnd);
+                square.addEventListener('dragover', dragOver);
+                square.addEventListener('dragenter', dragEnter);
+                square.addEventListener('dragleave', dragLeave);
+                square.addEventListener('drop', dragDrop);
+
+                // Touch Swipe Events
+                square.addEventListener('touchstart', touchStart, {passive: false});
+                square.addEventListener('touchmove', touchMove, {passive: false});
+                square.addEventListener('touchend', touchEnd);
+
+                // Click (Fallback)
+                square.addEventListener('click', () => clickSquare(square));
+            }
+        }
+
+        // --- 4. 互動邏輯 (拖曳、滑動、點擊) ---
+
+        // Drag & Drop Functions (Desktop)
+        function dragStart() {
+            if (isProcessing || moves <= 0) return;
+            squareIdBeingDragged = parseInt(this.id);
+        }
+
+        function dragOver(e) { e.preventDefault(); }
+        function dragEnter(e) { e.preventDefault(); }
+        function dragLeave() {}
+
+        function dragDrop() {
+            if (isProcessing || moves <= 0) return;
+            squareIdBeingReplaced = parseInt(this.id);
+            
+            // 處理交換
+            const squareDragged = squares[squareIdBeingDragged];
+            const squareReplaced = squares[squareIdBeingReplaced];
+            
+            // 檢查是否相鄰
+            if(isValidMove(squareIdBeingDragged, squareIdBeingReplaced)) {
+                swapSquare(squareDragged, squareReplaced);
+            }
+        }
+
+        function dragEnd() {
+            // 清理樣式等
+        }
+
+        // Touch Functions (Mobile Swipe)
+        function touchStart(e) {
+            if (isProcessing || moves <= 0) return;
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }
+
+        function touchMove(e) {
+            // 防止滑動時畫面捲動
+        }
+
+        function touchEnd(e) {
+            if (isProcessing || moves <= 0) return;
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            
+            handleSwipe(parseInt(this.id));
+        }
+
+        function handleSwipe(startId) {
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            const threshold = 30; // 滑動靈敏度
+
+            let targetId = -1;
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                // 水平滑動
+                if (Math.abs(diffX) > threshold) {
+                    if (diffX > 0) targetId = startId + 1; // 右
+                    else targetId = startId - 1; // 左
+                    
+                    // 邊界檢查: 防止左滑跨行或右滑跨行
+                    if (diffX > 0 && startId % width === width - 1) return;
+                    if (diffX < 0 && startId % width === 0) return;
+                }
+            } else {
+                // 垂直滑動
+                if (Math.abs(diffY) > threshold) {
+                    if (diffY > 0) targetId = startId + width; // 下
+                    else targetId = startId - width; // 上
+                }
+            }
+
+            if (targetId >= 0 && targetId < width * width) {
+                swapSquare(squares[startId], squares[targetId]);
+            }
+        }
+
+        // Click Logic (Hybrid/Fallback)
+        function clickSquare(square) {
+            if (isProcessing || moves <= 0) return;
+
+            if (!selectedSquare) {
+                selectedSquare = square;
+                square.classList.add('selected');
+            } else {
+                const currentId = parseInt(square.id);
+                const prevId = parseInt(selectedSquare.id);
+
+                selectedSquare.classList.remove('selected');
+                selectedSquare = null; // 重置選取狀態
+
+                if (currentId === prevId) return;
+
+                if (isValidMove(prevId, currentId)) {
+                    swapSquare(squares[prevId], squares[currentId]);
+                }
+            }
+        }
+
+        // Helper: Check Adjacency
+        function isValidMove(id1, id2) {
+            const isAdjacent = [id1 - 1, id1 + 1, id1 - width, id1 + width].includes(id2);
+            const isRightEdge = (id1 % width === width - 1) && (id2 === id1 + 1);
+            const isLeftEdge = (id1 % width === 0) && (id2 === id1 - 1);
+            
+            return isAdjacent && !isRightEdge && !isLeftEdge;
+        }
+
+        function swapSquare(square1, square2) {
+            isProcessing = true;
+            
+            const tempType = square1.getAttribute('data-type');
+            const tempText = square1.innerText;
+
+            square1.setAttribute('data-type', square2.getAttribute('data-type'));
+            square1.innerText = square2.innerText;
+
+            square2.setAttribute('data-type', tempType);
+            square2.innerText = tempText;
+
+            const matchFound = checkForMatches(false);
+
+            if (matchFound) {
+                setTimeout(() => {
+                    presentQuiz(square1, square2); 
+                }, 300);
+            } else {
+                setTimeout(() => {
+                    // 交換回來
+                    square2.setAttribute('data-type', square1.getAttribute('data-type'));
+                    square2.innerText = square1.innerText;
+                    square1.setAttribute('data-type', tempType);
+                    square1.innerText = tempText;
+                    
+                    // 動畫提示
+                    square1.style.animation = 'shake 0.4s';
+                    square2.style.animation = 'shake 0.4s';
+                    setTimeout(() => {
+                        square1.style.animation = '';
+                        square2.style.animation = '';
+                        isProcessing = false;
+                    }, 400);
+                }, 300);
+            }
+        }
+
+        // --- 5. 答題系統 (新增解說與Hold機制) ---
+        function presentQuiz(square1, square2) {
+            const modal = document.getElementById('quiz-modal');
+            const qEl = document.getElementById('quiz-question');
+            const optsEl = document.getElementById('quiz-options');
+            const feedbackEl = document.getElementById('quiz-feedback');
+            const explSection = document.getElementById('quiz-explanation');
+            const explText = document.getElementById('explanation-text');
+            const skipHint = document.getElementById('skip-hint');
+
+            // 準備題目
+            const qData = questions[Math.floor(Math.random() * questions.length)];
+            
+            qEl.innerText = qData.question;
+            optsEl.innerHTML = '';
+            optsEl.classList.remove('locked'); // 解鎖
+            
+            feedbackEl.innerText = '';
+            feedbackEl.className = '';
+            
+            explSection.style.display = 'none'; // 隱藏解說
+            explText.innerText = qData.explanation; // 填入解說
+            skipHint.style.display = 'none';
+
+            let hasAnsweredWrong = false;
+
+            const shuffledOptions = [...qData.options].sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = opt;
+                btn.onclick = (e) => {
+                    e.stopPropagation(); // 防止冒泡觸發 modal 的點擊解除
+
+                    if (btn.classList.contains('wrong') || btn.classList.contains('correct') || optsEl.classList.contains('locked')) return;
+
+                    if (opt === qData.answer) {
+                        // --- 答對 ---
+                        btn.classList.add('correct');
+                        feedbackEl.innerText = '✅ 太棒了！答對了！';
+                        feedbackEl.className = 'feedback-correct';
+                        
+                        totalQuestionsAnswered++;
+                        if (!hasAnsweredWrong) firstTryCorrectCount++;
+
+                        // 鎖定所有按鈕
+                        const allBtns = optsEl.querySelectorAll('button');
+                        allBtns.forEach(b => b.disabled = true);
+                        
+                        // 顯示解說
+                        explSection.style.display = 'block';
+                        skipHint.style.display = 'block';
+                        skipHint.innerText = '⏳ 閱讀時間... (點擊任意處繼續)';
+
+                        // Hold 3秒
+                        startHoldTimer(3000, () => {
+                            modal.classList.remove('active');
+                            handleCorrectAnswer();
+                        });
+
+                    } else {
+                        // --- 答錯 ---
+                        btn.classList.add('wrong');
+                        // btn.disabled = true; // 暫時不disable，因為要鎖定整個區塊
+                        feedbackEl.innerText = '❌ 不對喔，先看看原理解說！';
+                        feedbackEl.className = 'feedback-wrong';
+                        
+                        hasAnsweredWrong = true;
+                        wrongQuestionsSet.add(qData.question + " (正解: " + qData.answer + ")");
+                        
+                        // 顯示解說
+                        explSection.style.display = 'block';
+                        
+                        // 鎖定選項，強迫閱讀 3 秒
+                        optsEl.classList.add('locked');
+                        skipHint.style.display = 'block';
+                        skipHint.innerText = '⏳ 請閱讀觀念... (3秒後可重答)';
+
+                        // Hold 3秒後解鎖重答
+                        startHoldTimer(3000, () => {
+                            optsEl.classList.remove('locked'); // 解鎖
+                            btn.disabled = true; // 剛剛按錯的那個要 disable
+                            feedbackEl.innerText = '💪 加油，再試一次！';
+                            feedbackEl.style.color = '#555';
+                            skipHint.style.display = 'none';
+                        });
+                    }
+                };
+                optsEl.appendChild(btn);
+            });
+
+            modal.classList.add('active');
+            
+            // 綁定點擊 Modal 解除 Timer (提早解除)
+            // 只有在 Timer 運作時有效
+            modal.onclick = () => {
+                if (holdTimer) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                    // 執行 Timer 結束後的動作
+                    if (optsEl.querySelectorAll('.correct').length > 0) {
+                        // 如果是答對狀態 -> 關閉
+                        modal.classList.remove('active');
+                        handleCorrectAnswer();
+                    } else {
+                        // 如果是答錯狀態 -> 解鎖重答
+                        optsEl.classList.remove('locked');
+                        const wrongBtns = optsEl.querySelectorAll('.wrong');
+                        wrongBtns.forEach(b => b.disabled = true);
+                        feedbackEl.innerText = '💪 加油，再試一次！';
+                        feedbackEl.style.color = '#555';
+                        skipHint.style.display = 'none';
+                    }
+                }
+            };
+        }
+
+        function startHoldTimer(duration, callback) {
+            if (holdTimer) clearTimeout(holdTimer);
+            holdTimer = setTimeout(() => {
+                holdTimer = null;
+                callback();
+            }, duration);
+        }
+
+        function handleCorrectAnswer() {
+            moves--;
+            updateStats();
+            processMatchesAndRefill(true);
+        }
+
+        // --- 6. 核心消除邏輯 ---
+        function checkForMatches(justCheck = false) {
+            let hasMatch = false;
+
+            // Rows
+            for (let i = 0; i < 64; i++) {
+                if (i % width > width - 3) continue;
+                let rowOfThree = [i, i + 1, i + 2];
+                let decidedType = squares[i].getAttribute('data-type');
+                const isBlank = squares[i].getAttribute('data-type') === '';
+
+                if (rowOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
+                    hasMatch = true;
+                    if (!justCheck) {
+                        rowOfThree.forEach(index => squares[index].classList.add('matched'));
+                    }
+                }
+            }
+
+            // Columns
+            for (let i = 0; i < 47; i++) {
+                let colOfThree = [i, i + width, i + width * 2];
+                let decidedType = squares[i].getAttribute('data-type');
+                const isBlank = squares[i].getAttribute('data-type') === '';
+
+                if (colOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
+                    hasMatch = true;
+                    if (!justCheck) {
+                        colOfThree.forEach(index => squares[index].classList.add('matched'));
+                    }
+                }
+            }
+            return hasMatch;
+        }
+
+        function processMatchesAndRefill(isPlayerMove) {
+            checkForMatches(false); 
+            const matchedSquares = document.querySelectorAll('.matched');
+            
+            if (matchedSquares.length > 0) {
+                const points = matchedSquares.length * 10;
+                score += points;
+                updateStats();
+
+                if (!isPlayerMove) {
+                    showCombo();
+                }
+
+                // 清除顯示
+                matchedSquares.forEach(square => {
+                    square.innerText = '';
+                    square.setAttribute('data-type', '');
+                    square.classList.remove('matched');
+                });
+
+                setTimeout(() => {
+                    moveDown(); // 這裡執行整欄重整
+                    setTimeout(() => {
+                        if (checkForMatches(true)) {
+                            processMatchesAndRefill(false);
+                        } else {
+                            isProcessing = false;
+                            checkGameOver();
+                        }
+                    }, 250);
+                }, 250);
+
+            } else {
+                isProcessing = false;
+                checkGameOver();
+            }
+        }
+
+        // === 修正後的重力掉落邏輯 (整欄重整) ===
+        function moveDown() {
+            for (let i = 0; i < width; i++) { // 對每一行 (Column)
+                let columnValues = [];
+                // 1. 收集該行所有非空的糖果
+                for (let j = 0; j < width; j++) {
+                    let index = j * width + i;
+                    let type = squares[index].getAttribute('data-type');
+                    if (type !== '') {
+                        columnValues.push(type);
+                    }
+                }
+
+                // 2. 計算需要補多少個新糖果
+                let missingCount = width - columnValues.length;
+
+                // 3. 在頂部加入新糖果
+                for (let k = 0; k < missingCount; k++) {
+                    let randomColor = Math.floor(Math.random() * candyColors.length);
+                    columnValues.unshift(candyColors[randomColor]);
+                }
+
+                // 4. 將新的列表寫回格子
+                for (let j = 0; j < width; j++) {
+                    let index = j * width + i;
+                    let type = columnValues[j];
+                    squares[index].setAttribute('data-type', type);
+                    squares[index].innerText = type;
+                    // 確保沒有殘留的 class
+                    squares[index].classList.remove('matched'); 
+                }
+            }
+        }
+
+        function checkRowForThree(silent) {
+            for (let i = 0; i < 64; i++) {
+                if (i % width > width - 3) continue;
+                let rowOfThree = [i, i + 1, i + 2];
+                let decidedType = squares[i].getAttribute('data-type');
+                const isBlank = squares[i].getAttribute('data-type') === '';
+                if (rowOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
+                    let randomColor = Math.floor(Math.random() * candyColors.length);
+                    squares[i+1].innerText = candyColors[randomColor];
+                    squares[i+1].setAttribute('data-type', candyColors[randomColor]);
+                }
+            }
+        }
+        function checkColumnForThree(silent) {
+            for (let i = 0; i < 47; i++) {
+                let colOfThree = [i, i + width, i + width * 2];
+                let decidedType = squares[i].getAttribute('data-type');
+                const isBlank = squares[i].getAttribute('data-type') === '';
+                if (colOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
+                    let randomColor = Math.floor(Math.random() * candyColors.length);
+                    squares[i+width].innerText = candyColors[randomColor];
+                    squares[i+width].setAttribute('data-type', candyColors[randomColor]);
+                }
+            }
+        }
+
+        // --- 7. 輔助功能 & 報告生成 ---
+        function updateStats() {
+            scoreDisplay.innerText = score;
+            movesDisplay.innerText = moves;
+        }
+
+        function checkGameOver() {
+            if (moves <= 0) {
+                document.getElementById('report-title').innerText = `${playerName} 的學習報告`;
+                document.getElementById('final-score').innerText = score;
+
+                let accuracy = 0;
+                if (totalQuestionsAnswered > 0) {
+                    accuracy = Math.round((firstTryCorrectCount / totalQuestionsAnswered) * 100);
+                }
+                document.getElementById('final-accuracy').innerText = accuracy + "%";
+
+                const reviewList = document.getElementById('review-list');
+                reviewList.innerHTML = '';
+                
+                if (wrongQuestionsSet.size > 0) {
+                    wrongQuestionsSet.forEach(item => {
+                        const li = document.createElement('li');
+                        li.innerText = item;
+                        reviewList.appendChild(li);
+                    });
+                } else {
+                    reviewList.innerHTML = '<div style="text-align: center; color: #4CAF50;">🎉 太棒了！全部題目都一次答對！</div>';
+                }
+
+                document.getElementById('game-over-modal').classList.add('active');
+            }
+        }
+
+        function showCombo() {
+            const combo = document.getElementById('combo-display');
+            combo.style.display = 'block';
+            combo.style.animation = 'none';
+            combo.offsetHeight; 
+            combo.style.animation = 'floatUp 1s forwards';
+            setTimeout(() => {
+                combo.style.display = 'none';
+            }, 1000);
+        }
+
+        // --- 8. 事件綁定 ---
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('start-modal').classList.remove('active');
+            initGame();
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            document.getElementById('game-over-modal').classList.remove('active');
+            document.getElementById('start-modal').classList.add('active');
+        });
+
+    </script>
+</body>
+</html>
