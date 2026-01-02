@@ -26,7 +26,7 @@
             min-height: 100vh;
             color: var(--text-color);
             overflow: hidden;
-            touch-action: none; /* 防止滑動時觸發瀏覽器動作 */
+            touch-action: none;
         }
 
         #app {
@@ -164,6 +164,46 @@
             position: relative;
         }
 
+        /* 答題控制列 (語言切換 + 發音) */
+        .quiz-controls {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .control-btn {
+            background: #f0f0f0;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+            color: #555;
+        }
+
+        .control-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .control-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .lang-btn {
+            border-radius: 12px;
+            width: auto;
+            padding: 0 10px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
         @keyframes slideUp {
             from { transform: translateY(20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
@@ -195,7 +235,6 @@
             transition: opacity 0.3s;
         }
         
-        /* 鎖定選項時的樣式 */
         .options-grid.locked {
             pointer-events: none;
             opacity: 0.7;
@@ -211,6 +250,7 @@
             cursor: pointer;
             transition: all 0.2s;
             text-align: left;
+            position: relative;
         }
 
         button.option-btn:hover:not(:disabled) {
@@ -252,7 +292,6 @@
             border-color: var(--primary-color);
         }
 
-        /* 科學解說區域 */
         #quiz-explanation {
             margin-top: 15px;
             padding: 15px;
@@ -261,7 +300,7 @@
             border-left: 5px solid var(--primary-color);
             text-align: left;
             font-size: 0.95rem;
-            display: none; /* 預設隱藏 */
+            display: none;
             animation: fadeIn 0.5s;
         }
         
@@ -276,7 +315,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 倒數/跳過提示 */
         #skip-hint {
             margin-top: 10px;
             font-size: 0.8rem;
@@ -292,7 +330,6 @@
             100% { opacity: 0.6; }
         }
 
-        /* 回饋文字區域 */
         #quiz-feedback {
             margin-top: 10px;
             font-weight: bold;
@@ -406,8 +443,13 @@
         <!-- Quiz Modal -->
         <div id="quiz-modal" class="modal-overlay">
             <div class="modal-content">
+                <div class="quiz-controls">
+                    <button class="control-btn" id="tts-btn" title="朗讀題目">🔊</button>
+                    <button class="control-btn lang-btn" id="lang-btn">ENG</button>
+                </div>
+
                 <span class="modal-icon">🤔</span>
-                <h2>考考你！</h2>
+                <h2 id="quiz-title">考考你！</h2>
                 <p id="quiz-question" class="question-text">題目載入中...</p>
                 
                 <div id="quiz-options" class="options-grid">
@@ -418,7 +460,7 @@
                 
                 <!-- 科學解說區域 -->
                 <div id="quiz-explanation">
-                    <strong>📖 科學小教室：</strong>
+                    <strong id="explanation-title">📖 科學小教室：</strong>
                     <span id="explanation-text"></span>
                 </div>
 
@@ -457,127 +499,288 @@
     </div>
 
     <script>
-        // --- 1. 遊戲資料 (題目庫 - 包含科學解說) ---
+        // --- 1. 遊戲資料 (雙語題目庫) ---
+        // zh: 中文, en: 英文
         const questions = [
-            { 
-                question: "天氣炎熱的時候，水會怎麼樣？", 
-                answer: "變成水蒸氣（蒸發）", 
-                options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成泥土"],
-                explanation: "熱能會讓水分子運動變快，掙脫水的束縛變成看不見的水蒸氣，這個過程叫做蒸發。"
+            {
+                zh: {
+                    question: "天氣炎熱的時候，水會怎麼樣？",
+                    answer: "變成水蒸氣（蒸發）",
+                    options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成泥土"],
+                    explanation: "熱能會讓水分子運動變快，掙脫水的束縛變成看不見的水蒸氣，這個過程叫做蒸發。"
+                },
+                en: {
+                    question: "What happens to water when the weather is hot?",
+                    answer: "Turns into water vapor (Evaporation)",
+                    options: ["Turns into water vapor (Evaporation)", "Turns into ice", "Turns into soil"],
+                    explanation: "Heat energy makes water molecules move faster and escape as invisible water vapor. This process is called evaporation."
+                }
             },
-            { 
-                question: "在雲中，水是怎麼樣的？", 
-                answer: "是水蒸氣（凝結）", 
-                options: ["是水蒸氣（凝結）", "是冰塊", "是喝的水"],
-                explanation: "當水蒸氣升到高空遇冷，會凝結成小水滴或小冰晶，聚在一起就變成了雲。"
+            {
+                zh: {
+                    question: "在雲中，水是怎麼樣的？",
+                    answer: "是水蒸氣（凝結）",
+                    options: ["是水蒸氣（凝結）", "是冰塊", "是喝的水"],
+                    explanation: "當水蒸氣升到高空遇冷，會凝結成小水滴或小冰晶，聚在一起就變成了雲。"
+                },
+                en: {
+                    question: "What form is water in the clouds?",
+                    answer: "Water vapor (Condensation)",
+                    options: ["Water vapor (Condensation)", "Ice cubes", "Drinking water"],
+                    explanation: "When water vapor rises and cools, it condenses into tiny water droplets or ice crystals, forming clouds."
+                }
             },
-            { 
-                question: "當雲飄到天空時，會發生什麼事？", 
-                answer: "水會降落成雨（降水）", 
-                options: ["水會降落成雨（降水）", "水會變成雪", "水會消失"],
-                explanation: "當雲裡的小水滴越聚越多，變得太重而空氣托不住時，就會掉下來形成雨，這叫降水。"
+            {
+                zh: {
+                    question: "當雲飄到天空時，會發生什麼事？",
+                    answer: "水會降落成雨（降水）",
+                    options: ["水會降落成雨（降水）", "水會變成雪", "水會消失"],
+                    explanation: "當雲裡的小水滴越聚越多，變得太重而空氣托不住時，就會掉下來形成雨，這叫降水。"
+                },
+                en: {
+                    question: "What happens when clouds move across the sky?",
+                    answer: "Water falls as rain (Precipitation)",
+                    options: ["Water falls as rain (Precipitation)", "Water turns into snow", "Water disappears"],
+                    explanation: "When water droplets in clouds gather and become too heavy for the air to hold, they fall as rain. This is called precipitation."
+                }
             },
-            { 
-                question: "夏天的時候，游泳池的水會怎麼樣？", 
-                answer: "蒸發成水蒸氣", 
-                options: ["蒸發成水蒸氣", "變成冰", "變成飲料"],
-                explanation: "夏天太陽很大，熱能會加速水面蒸發，所以游泳池的水位會慢慢下降。"
+            {
+                zh: {
+                    question: "夏天的時候，游泳池的水會怎麼樣？",
+                    answer: "蒸發成水蒸氣",
+                    options: ["蒸發成水蒸氣", "變成冰", "變成飲料"],
+                    explanation: "夏天太陽很大，熱能會加速水面蒸發，所以游泳池的水位會慢慢下降。"
+                },
+                en: {
+                    question: "What happens to pool water in the summer?",
+                    answer: "Evaporates into water vapor",
+                    options: ["Evaporates into water vapor", "Turns into ice", "Turns into a drink"],
+                    explanation: "The sun's heat speeds up evaporation from the surface, so the water level in the pool slowly drops."
+                }
             },
-            { 
-                question: "雨水是怎麼來的？", 
-                answer: "從雲裡降落（降水）", 
-                options: ["從雲裡降落（降水）", "直接從地面", "從樹上掉下來"],
-                explanation: "雨水是雲層中的水滴變大後，受重力影響掉落下來的現象。"
+            {
+                zh: {
+                    question: "雨水是怎麼來的？",
+                    answer: "從雲裡降落（降水）",
+                    options: ["從雲裡降落（降水）", "直接從地面", "從樹上掉下來"],
+                    explanation: "雨水是雲層中的水滴變大後，受重力影響掉落下來的現象。"
+                },
+                en: {
+                    question: "Where does rain come from?",
+                    answer: "Falls from clouds (Precipitation)",
+                    options: ["Falls from clouds (Precipitation)", "Directly from the ground", "Falls from trees"],
+                    explanation: "Rain occurs when water droplets in clouds grow larger and fall due to gravity."
+                }
             },
-            { 
-                question: "早晨為什麼有霧？", 
-                answer: "水蒸氣凝結成小水滴", 
-                options: ["水蒸氣凝結成小水滴", "水蒸氣消失", "雲變成霧"],
-                explanation: "夜晚地面變冷，接近地面的水蒸氣遇冷凝結成懸浮的小水滴，就形成了霧。"
+            {
+                zh: {
+                    question: "早晨為什麼有霧？",
+                    answer: "水蒸氣凝結成小水滴",
+                    options: ["水蒸氣凝結成小水滴", "水蒸氣消失", "雲變成霧"],
+                    explanation: "夜晚地面變冷，接近地面的水蒸氣遇冷凝結成懸浮的小水滴，就形成了霧。"
+                },
+                en: {
+                    question: "Why is there fog in the morning?",
+                    answer: "Water vapor condenses into droplets",
+                    options: ["Water vapor condenses into droplets", "Water vapor disappears", "Clouds turn into fog"],
+                    explanation: "The ground cools at night, causing water vapor near the ground to condense into tiny floating droplets, forming fog."
+                }
             },
-            { 
-                question: "花園裡的水，當太陽出來的時候會發生什麼？", 
-                answer: "蒸發（蒸發）", 
-                options: ["蒸發（蒸發）", "變成泥土", "變成冰"],
-                explanation: "太陽的熱力會讓土壤或葉子上的水分轉變成氣體，回到空氣中。"
+            {
+                zh: {
+                    question: "花園裡的水，當太陽出來的時候會發生什麼？",
+                    answer: "蒸發（蒸發）",
+                    options: ["蒸發（蒸發）", "變成泥土", "變成冰"],
+                    explanation: "太陽的熱力會讓土壤或葉子上的水分轉變成氣體，回到空氣中。"
+                },
+                en: {
+                    question: "What happens to garden water when the sun comes out?",
+                    answer: "Evaporates (Evaporation)",
+                    options: ["Evaporates (Evaporation)", "Turns into soil", "Turns into ice"],
+                    explanation: "The sun's heat turns water on soil or leaves into gas, returning it to the air."
+                }
             },
-            { 
-                question: "冬天下雪的時候，水是怎麼在天上形成的？", 
-                answer: "質變成雲（凝結）", 
-                options: ["質變成雲（凝結）", "變成雨", "變成水滴"],
-                explanation: "在非常冷的高空，水蒸氣會直接凝華成小冰晶，聚集後掉落就是雪。"
+            {
+                zh: {
+                    question: "冬天下雪的時候，水是怎麼在天上形成的？",
+                    answer: "質變成雲（凝結）",
+                    options: ["質變成雲（凝結）", "變成雨", "變成水滴"],
+                    explanation: "在非常冷的高空，水蒸氣會直接凝華成小冰晶，聚集後掉落就是雪。"
+                },
+                en: {
+                    question: "How does snow form in the sky in winter?",
+                    answer: "Turns into clouds (Condensation)",
+                    options: ["Turns into clouds (Condensation)", "Turns into rain", "Turns into droplets"],
+                    explanation: "In very cold air, water vapor turns directly into ice crystals. When they gather and fall, it is snow."
+                }
             },
-            { 
-                question: "雨後天空中有彩虹，這是因為什麼？", 
-                answer: "水蒸氣在空中凝結", 
-                options: ["水蒸氣在空中凝結", "雲出現了", "水變成冰"],
-                explanation: "彩虹是因為陽光照射到空氣中殘留的小水滴，產生折射和反射形成的。"
+            {
+                zh: {
+                    question: "雨後天空中有彩虹，這是因為什麼？",
+                    answer: "水蒸氣在空中凝結",
+                    options: ["水蒸氣在空中凝結", "雲出現了", "水變成冰"],
+                    explanation: "彩虹是因為陽光照射到空氣中殘留的小水滴，產生折射和反射形成的。"
+                },
+                en: {
+                    question: "Why is there a rainbow after rain?",
+                    answer: "Water vapor condenses in the air",
+                    options: ["Water vapor condenses in the air", "Clouds appear", "Water turns into ice"],
+                    explanation: "Rainbows form when sunlight hits remaining water droplets in the air, creating refraction and reflection."
+                }
             },
-            { 
-                question: "植物怎麼得到水？", 
-                answer: "從土壤裡吸收水（降水）", 
-                options: ["從土壤裡吸收水（降水）", "從太陽那裡", "從風中"],
-                explanation: "雨水（降水）滲入土壤後，植物的根部會把水吸上來維持生命。"
+            {
+                zh: {
+                    question: "植物怎麼得到水？",
+                    answer: "從土壤裡吸收水（降水）",
+                    options: ["從土壤裡吸收水（降水）", "從太陽那裡", "從風中"],
+                    explanation: "雨水（降水）滲入土壤後，植物的根部會把水吸上來維持生命。"
+                },
+                en: {
+                    question: "How do plants get water?",
+                    answer: "Absorb from soil (Precipitation)",
+                    options: ["Absorb from soil (Precipitation)", "From the sun", "From the wind"],
+                    explanation: "After rain (precipitation) soaks into the soil, plant roots absorb the water to survive."
+                }
             },
-            { 
-                question: "熱水壺裡的水加熱後會怎麼樣？", 
-                answer: "變成水蒸氣（蒸發）", 
-                options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成飲料"],
-                explanation: "加熱提供了能量，讓水快速沸騰並大量轉變為水蒸氣。"
+            {
+                zh: {
+                    question: "熱水壺裡的水加熱後會怎麼樣？",
+                    answer: "變成水蒸氣（蒸發）",
+                    options: ["變成水蒸氣（蒸發）", "變成冰塊", "變成飲料"],
+                    explanation: "加熱提供了能量，讓水快速沸騰並大量轉變為水蒸氣。"
+                },
+                en: {
+                    question: "What happens when water in a kettle is heated?",
+                    answer: "Turns into water vapor (Evaporation)",
+                    options: ["Turns into water vapor (Evaporation)", "Turns into ice", "Turns into a drink"],
+                    explanation: "Heating provides energy, causing water to boil quickly and turn into water vapor."
+                }
             },
-            { 
-                question: "晚上，如果空氣裡的水蒸氣變冷了會怎麼樣？", 
-                answer: "形成露珠（凝結）", 
-                options: ["形成露珠（凝結）", "變成太陽", "消失"],
-                explanation: "晚上的冷空氣讓水蒸氣接觸到冰涼的草葉表面時，凝結成液態的小水珠，稱為露水。"
+            {
+                zh: {
+                    question: "晚上，如果空氣裡的水蒸氣變冷了會怎麼樣？",
+                    answer: "形成露珠（凝結）",
+                    options: ["形成露珠（凝結）", "變成太陽", "消失"],
+                    explanation: "晚上的冷空氣讓水蒸氣接觸到冰涼的草葉表面時，凝結成液態的小水珠，稱為露水。"
+                },
+                en: {
+                    question: "What happens if water vapor in the air cools at night?",
+                    answer: "Forms dew (Condensation)",
+                    options: ["Forms dew (Condensation)", "Turns into the sun", "Disappears"],
+                    explanation: "Cool air at night causes water vapor to condense into liquid droplets on cool surfaces like grass, forming dew."
+                }
             },
-            { 
-                question: "下雨的時候，水去哪裡了？", 
-                answer: "從雲裡掉下來（降水）", 
-                options: ["從雲裡掉下來（降水）", "消失了", "回到土裡"],
-                explanation: "雨水會落到地面，有的流入河流，有的滲入地下，最後再流回大海，完成循環。"
+            {
+                zh: {
+                    question: "下雨的時候，水去哪裡了？",
+                    answer: "從雲裡掉下來（降水）",
+                    options: ["從雲裡掉下來（降水）", "消失了", "回到土裡"],
+                    explanation: "雨水會落到地面，有的流入河流，有的滲入地下，最後再流回大海，完成循環。"
+                },
+                en: {
+                    question: "Where does water go when it rains?",
+                    answer: "Falls from clouds (Precipitation)",
+                    options: ["Falls from clouds (Precipitation)", "Disappears", "Returns to the soil"],
+                    explanation: "Rain falls to the ground, flows into rivers, soaks into the ground, and eventually returns to the ocean, completing the cycle."
+                }
             },
-            { 
-                question: "在夏天炎熱的城市裡，馬路上的水會怎麼樣？", 
-                answer: "渐渐蒸發（蒸發）", 
-                options: ["渐渐蒸發（蒸發）", "變成冰", "生成泥塵"],
-                explanation: "柏油路吸熱快，高溫會讓灑在路上的水非常迅速地蒸發掉。"
+            {
+                zh: {
+                    question: "在夏天炎熱的城市裡，馬路上的水會怎麼樣？",
+                    answer: "渐渐蒸發（蒸發）",
+                    options: ["渐渐蒸發（蒸發）", "變成冰", "生成泥塵"],
+                    explanation: "柏油路吸熱快，高溫會讓灑在路上的水非常迅速地蒸發掉。"
+                },
+                en: {
+                    question: "What happens to water on the road in a hot city?",
+                    answer: "Gradually evaporates (Evaporation)",
+                    options: ["Gradually evaporates (Evaporation)", "Turns into ice", "Creates dust"],
+                    explanation: "Asphalt absorbs heat quickly, and the high temperature causes water on the road to evaporate very fast."
+                }
             },
-            { 
-                question: "水蒸氣在空中會怎麼形成雲？", 
-                answer: "因為變冷凝結", 
-                options: ["因為變冷凝結", "因為變熱", "因為下雨"],
-                explanation: "高空溫度比地面低，熱空氣上升後變冷，水蒸氣就會凝結成雲。"
+            {
+                zh: {
+                    question: "水蒸氣在空中會怎麼形成雲？",
+                    answer: "因為變冷凝結",
+                    options: ["因為變冷凝結", "因為變熱", "因為下雨"],
+                    explanation: "高空溫度比地面低，熱空氣上升後變冷，水蒸氣就會凝結成雲。"
+                },
+                en: {
+                    question: "How does water vapor form clouds in the air?",
+                    answer: "By cooling and condensing",
+                    options: ["By cooling and condensing", "By getting hot", "Because of rain"],
+                    explanation: "The air is cooler high up. As warm air rises and cools, water vapor condenses to form clouds."
+                }
             },
-            { 
-                question: "我們從哪裡能找到雲中的水？", 
-                answer: "水蒸氣凝結", 
-                options: ["水蒸氣凝結", "河裡", "地面"],
-                explanation: "雖然雲在天上，但它其實就是由無數的小水滴或小冰晶組成的。"
+            {
+                zh: {
+                    question: "我們從哪裡能找到雲中的水？",
+                    answer: "水蒸氣凝結",
+                    options: ["水蒸氣凝結", "河裡", "地面"],
+                    explanation: "雖然雲在天上，但它其實就是由無數的小水滴或小冰晶組成的。"
+                },
+                en: {
+                    question: "Where can we find the water in clouds?",
+                    answer: "Water vapor condensation",
+                    options: ["Water vapor condensation", "In rivers", "On the ground"],
+                    explanation: "Clouds are actually made up of countless tiny water droplets or ice crystals."
+                }
             },
-            { 
-                question: "當雲變厚，會發生什麼？", 
-                answer: "開始下雨（降水）", 
-                options: ["開始下雨（降水）", "變成白雲", "消失"],
-                explanation: "雲變厚變黑代表水滴非常密集且厚重，陽光穿不透，通常預示著快要下雨了。"
+            {
+                zh: {
+                    question: "當雲變厚，會發生什麼？",
+                    answer: "開始下雨（降水）",
+                    options: ["開始下雨（降水）", "變成白雲", "消失"],
+                    explanation: "雲變厚變黑代表水滴非常密集且厚重，陽光穿不透，通常預示著快要下雨了。"
+                },
+                en: {
+                    question: "What happens when clouds get thick?",
+                    answer: "Starts to rain (Precipitation)",
+                    options: ["Starts to rain (Precipitation)", "Turns into white clouds", "Disappears"],
+                    explanation: "Thick, dark clouds mean water droplets are dense and heavy, blocking sunlight, usually indicating rain is coming."
+                }
             },
-            { 
-                question: "當水面上有水蒸氣時，我們在水裡應該注意什麼？", 
-                answer: "水會蒸發（蒸發）", 
-                options: ["水會蒸發（蒸發）", "水會變多", "水會變成冰"],
-                explanation: "水時刻都在蒸發，只是溫度越高蒸發越快，我們肉眼不一定看得到。"
+            {
+                zh: {
+                    question: "當水面上有水蒸氣時，我們在水裡應該注意什麼？",
+                    answer: "水會蒸發（蒸發）",
+                    options: ["水會蒸發（蒸發）", "水會變多", "水會變成冰"],
+                    explanation: "水時刻都在蒸發，只是溫度越高蒸發越快，我們肉眼不一定看得到。"
+                },
+                en: {
+                    question: "What should we note when there is water vapor over water?",
+                    answer: "Water is evaporating (Evaporation)",
+                    options: ["Water is evaporating (Evaporation)", "Water increases", "Water turns into ice"],
+                    explanation: "Water evaporates all the time. Higher temperatures mean faster evaporation, even if we can't always see it."
+                }
             },
-            { 
-                question: "秋天時，空氣變涼，水會發生什麼？", 
-                answer: "形成小水珠（凝結）", 
-                options: ["形成小水珠（凝結）", "消失了", "變成冰"],
-                explanation: "涼爽的空氣讓水蒸氣更容易凝結，所以秋天的早晨常能在窗戶或車上看到霧氣。"
+            {
+                zh: {
+                    question: "秋天時，空氣變涼，水會發生什麼？",
+                    answer: "形成小水珠（凝結）",
+                    options: ["形成小水珠（凝結）", "消失了", "變成冰"],
+                    explanation: "涼爽的空氣讓水蒸氣更容易凝結，所以秋天的早晨常能在窗戶或車上看到霧氣。"
+                },
+                en: {
+                    question: "What happens to water in autumn when the air gets cool?",
+                    answer: "Forms small droplets (Condensation)",
+                    options: ["Forms small droplets (Condensation)", "Disappears", "Turns into ice"],
+                    explanation: "Cool air makes it easier for water vapor to condense, so we often see mist on windows or cars in autumn mornings."
+                }
             },
-            { 
-                question: "天上有很多雲，會發生什麼？", 
-                answer: "有可能會下雨（降水）", 
-                options: ["有可能會下雨（降水）", "空氣變熱", "雲變得更白"],
-                explanation: "雲量多代表空氣中水氣充足，下雨的機率自然就變高了。"
+            {
+                zh: {
+                    question: "天上有很多雲，會發生什麼？",
+                    answer: "有可能會下雨（降水）",
+                    options: ["有可能會下雨（降水）", "空氣變熱", "雲變得更白"],
+                    explanation: "雲量多代表空氣中水氣充足，下雨的機率自然就變高了。"
+                },
+                en: {
+                    question: "What happens when there are many clouds in the sky?",
+                    answer: "It might rain (Precipitation)",
+                    options: ["It might rain (Precipitation)", "Air gets hot", "Clouds get whiter"],
+                    explanation: "Many clouds mean there is plenty of moisture in the air, increasing the chance of rain."
+                }
             }
         ];
 
@@ -596,6 +799,10 @@
         let isProcessing = false;
         let playerName = "學生";
         let holdTimer = null;
+        
+        // 語言設定
+        let currentLang = 'zh'; // 'zh' or 'en'
+        let currentQData = null; // 當前題目資料
         
         // 拖曳與滑動相關變數
         let squareIdBeingDragged;
@@ -638,9 +845,7 @@
         function createBoard() {
             for (let i = 0; i < width * width; i++) {
                 const square = document.createElement('div');
-                // Drag Events
                 square.setAttribute('draggable', true);
-                
                 square.setAttribute('id', i);
                 square.classList.add('cell');
                 
@@ -651,7 +856,7 @@
                 grid.appendChild(square);
                 squares.push(square);
 
-                // Mouse Drag Events
+                // Mouse Events
                 square.addEventListener('dragstart', dragStart);
                 square.addEventListener('dragend', dragEnd);
                 square.addEventListener('dragover', dragOver);
@@ -659,153 +864,109 @@
                 square.addEventListener('dragleave', dragLeave);
                 square.addEventListener('drop', dragDrop);
 
-                // Touch Swipe Events
+                // Touch Events
                 square.addEventListener('touchstart', touchStart, {passive: false});
                 square.addEventListener('touchmove', touchMove, {passive: false});
                 square.addEventListener('touchend', touchEnd);
 
-                // Click (Fallback)
                 square.addEventListener('click', () => clickSquare(square));
             }
         }
 
-        // --- 4. 互動邏輯 (拖曳、滑動、點擊) ---
-
-        // Drag & Drop Functions (Desktop)
+        // --- 4. 互動邏輯 ---
         function dragStart() {
             if (isProcessing || moves <= 0) return;
             squareIdBeingDragged = parseInt(this.id);
         }
-
         function dragOver(e) { e.preventDefault(); }
         function dragEnter(e) { e.preventDefault(); }
         function dragLeave() {}
-
         function dragDrop() {
             if (isProcessing || moves <= 0) return;
             squareIdBeingReplaced = parseInt(this.id);
-            
-            // 處理交換
-            const squareDragged = squares[squareIdBeingDragged];
-            const squareReplaced = squares[squareIdBeingReplaced];
-            
-            // 檢查是否相鄰
             if(isValidMove(squareIdBeingDragged, squareIdBeingReplaced)) {
-                swapSquare(squareDragged, squareReplaced);
+                swapSquare(squares[squareIdBeingDragged], squares[squareIdBeingReplaced]);
             }
         }
+        function dragEnd() {}
 
-        function dragEnd() {
-            // 清理樣式等
-        }
-
-        // Touch Functions (Mobile Swipe)
         function touchStart(e) {
             if (isProcessing || moves <= 0) return;
             touchStartX = e.changedTouches[0].screenX;
             touchStartY = e.changedTouches[0].screenY;
         }
-
-        function touchMove(e) {
-            // 防止滑動時畫面捲動
-        }
-
+        function touchMove(e) {}
         function touchEnd(e) {
             if (isProcessing || moves <= 0) return;
             touchEndX = e.changedTouches[0].screenX;
             touchEndY = e.changedTouches[0].screenY;
-            
             handleSwipe(parseInt(this.id));
         }
-
         function handleSwipe(startId) {
             const diffX = touchEndX - touchStartX;
             const diffY = touchEndY - touchStartY;
-            const threshold = 30; // 滑動靈敏度
-
+            const threshold = 30;
             let targetId = -1;
-
             if (Math.abs(diffX) > Math.abs(diffY)) {
-                // 水平滑動
                 if (Math.abs(diffX) > threshold) {
-                    if (diffX > 0) targetId = startId + 1; // 右
-                    else targetId = startId - 1; // 左
-                    
-                    // 邊界檢查: 防止左滑跨行或右滑跨行
+                    if (diffX > 0) targetId = startId + 1;
+                    else targetId = startId - 1;
                     if (diffX > 0 && startId % width === width - 1) return;
                     if (diffX < 0 && startId % width === 0) return;
                 }
             } else {
-                // 垂直滑動
                 if (Math.abs(diffY) > threshold) {
-                    if (diffY > 0) targetId = startId + width; // 下
-                    else targetId = startId - width; // 上
+                    if (diffY > 0) targetId = startId + width;
+                    else targetId = startId - width;
                 }
             }
-
             if (targetId >= 0 && targetId < width * width) {
                 swapSquare(squares[startId], squares[targetId]);
             }
         }
-
-        // Click Logic (Hybrid/Fallback)
         function clickSquare(square) {
             if (isProcessing || moves <= 0) return;
-
             if (!selectedSquare) {
                 selectedSquare = square;
                 square.classList.add('selected');
             } else {
                 const currentId = parseInt(square.id);
                 const prevId = parseInt(selectedSquare.id);
-
                 selectedSquare.classList.remove('selected');
-                selectedSquare = null; // 重置選取狀態
-
+                selectedSquare = null;
                 if (currentId === prevId) return;
-
                 if (isValidMove(prevId, currentId)) {
                     swapSquare(squares[prevId], squares[currentId]);
                 }
             }
         }
-
-        // Helper: Check Adjacency
         function isValidMove(id1, id2) {
             const isAdjacent = [id1 - 1, id1 + 1, id1 - width, id1 + width].includes(id2);
             const isRightEdge = (id1 % width === width - 1) && (id2 === id1 + 1);
             const isLeftEdge = (id1 % width === 0) && (id2 === id1 - 1);
-            
             return isAdjacent && !isRightEdge && !isLeftEdge;
         }
 
         function swapSquare(square1, square2) {
             isProcessing = true;
-            
             const tempType = square1.getAttribute('data-type');
             const tempText = square1.innerText;
-
             square1.setAttribute('data-type', square2.getAttribute('data-type'));
             square1.innerText = square2.innerText;
-
             square2.setAttribute('data-type', tempType);
             square2.innerText = tempText;
 
             const matchFound = checkForMatches(false);
-
             if (matchFound) {
                 setTimeout(() => {
                     presentQuiz(square1, square2); 
                 }, 300);
             } else {
                 setTimeout(() => {
-                    // 交換回來
                     square2.setAttribute('data-type', square1.getAttribute('data-type'));
                     square2.innerText = square1.innerText;
                     square1.setAttribute('data-type', tempType);
                     square1.innerText = tempText;
-                    
-                    // 動畫提示
                     square1.style.animation = 'shake 0.4s';
                     square2.style.animation = 'shake 0.4s';
                     setTimeout(() => {
@@ -817,122 +978,201 @@
             }
         }
 
-        // --- 5. 答題系統 (新增解說與Hold機制) ---
+        // --- 5. 答題系統 (雙語版) ---
+        let currentQuizIndex = -1; // 追蹤當前題目索引
+        let currentOptionsOrder = []; // 追蹤當前選項順序
+
         function presentQuiz(square1, square2) {
+            // 重置 UI 狀態 (修復：確保每次新題目都是乾淨的)
+            document.getElementById('quiz-feedback').innerText = '';
+            document.getElementById('quiz-feedback').className = '';
+            document.getElementById('quiz-explanation').style.display = 'none';
+            document.getElementById('skip-hint').style.display = 'none';
+            document.getElementById('quiz-options').classList.remove('locked');
+
+            // 隨機選題
+            currentQuizIndex = Math.floor(Math.random() * questions.length);
+            
+            // 重置選項順序，隨機排列一次
+            const rawOptions = questions[currentQuizIndex].zh.options; // 這裡只用來產生索引
+            currentOptionsOrder = Array.from({length: rawOptions.length}, (_, i) => i).sort(() => Math.random() - 0.5);
+
+            renderQuizContent(square1, square2);
+            
             const modal = document.getElementById('quiz-modal');
-            const qEl = document.getElementById('quiz-question');
-            const optsEl = document.getElementById('quiz-options');
-            const feedbackEl = document.getElementById('quiz-feedback');
-            const explSection = document.getElementById('quiz-explanation');
-            const explText = document.getElementById('explanation-text');
-            const skipHint = document.getElementById('skip-hint');
-
-            // 準備題目
-            const qData = questions[Math.floor(Math.random() * questions.length)];
-            
-            qEl.innerText = qData.question;
-            optsEl.innerHTML = '';
-            optsEl.classList.remove('locked'); // 解鎖
-            
-            feedbackEl.innerText = '';
-            feedbackEl.className = '';
-            
-            explSection.style.display = 'none'; // 隱藏解說
-            explText.innerText = qData.explanation; // 填入解說
-            skipHint.style.display = 'none';
-
-            let hasAnsweredWrong = false;
-
-            const shuffledOptions = [...qData.options].sort(() => Math.random() - 0.5);
-
-            shuffledOptions.forEach(opt => {
-                const btn = document.createElement('button');
-                btn.className = 'option-btn';
-                btn.innerText = opt;
-                btn.onclick = (e) => {
-                    e.stopPropagation(); // 防止冒泡觸發 modal 的點擊解除
-
-                    if (btn.classList.contains('wrong') || btn.classList.contains('correct') || optsEl.classList.contains('locked')) return;
-
-                    if (opt === qData.answer) {
-                        // --- 答對 ---
-                        btn.classList.add('correct');
-                        feedbackEl.innerText = '✅ 太棒了！答對了！';
-                        feedbackEl.className = 'feedback-correct';
-                        
-                        totalQuestionsAnswered++;
-                        if (!hasAnsweredWrong) firstTryCorrectCount++;
-
-                        // 鎖定所有按鈕
-                        const allBtns = optsEl.querySelectorAll('button');
-                        allBtns.forEach(b => b.disabled = true);
-                        
-                        // 顯示解說
-                        explSection.style.display = 'block';
-                        skipHint.style.display = 'block';
-                        skipHint.innerText = '⏳ 閱讀時間... (點擊任意處繼續)';
-
-                        // Hold 3秒
-                        startHoldTimer(3000, () => {
-                            modal.classList.remove('active');
-                            handleCorrectAnswer();
-                        });
-
-                    } else {
-                        // --- 答錯 ---
-                        btn.classList.add('wrong');
-                        // btn.disabled = true; // 暫時不disable，因為要鎖定整個區塊
-                        feedbackEl.innerText = '❌ 不對喔，先看看原理解說！';
-                        feedbackEl.className = 'feedback-wrong';
-                        
-                        hasAnsweredWrong = true;
-                        wrongQuestionsSet.add(qData.question + " (正解: " + qData.answer + ")");
-                        
-                        // 顯示解說
-                        explSection.style.display = 'block';
-                        
-                        // 鎖定選項，強迫閱讀 3 秒
-                        optsEl.classList.add('locked');
-                        skipHint.style.display = 'block';
-                        skipHint.innerText = '⏳ 請閱讀觀念... (3秒後可重答)';
-
-                        // Hold 3秒後解鎖重答
-                        startHoldTimer(3000, () => {
-                            optsEl.classList.remove('locked'); // 解鎖
-                            btn.disabled = true; // 剛剛按錯的那個要 disable
-                            feedbackEl.innerText = '💪 加油，再試一次！';
-                            feedbackEl.style.color = '#555';
-                            skipHint.style.display = 'none';
-                        });
-                    }
-                };
-                optsEl.appendChild(btn);
-            });
-
             modal.classList.add('active');
             
-            // 綁定點擊 Modal 解除 Timer (提早解除)
-            // 只有在 Timer 運作時有效
-            modal.onclick = () => {
+            // 綁定提早解除
+            modal.onclick = (e) => {
+                // 如果點到控制按鈕，不觸發解除
+                if (e.target.closest('.control-btn')) return;
+
                 if (holdTimer) {
                     clearTimeout(holdTimer);
                     holdTimer = null;
-                    // 執行 Timer 結束後的動作
+                    const optsEl = document.getElementById('quiz-options');
+                    const feedbackEl = document.getElementById('quiz-feedback');
+                    const skipHint = document.getElementById('skip-hint');
+                    
                     if (optsEl.querySelectorAll('.correct').length > 0) {
-                        // 如果是答對狀態 -> 關閉
                         modal.classList.remove('active');
                         handleCorrectAnswer();
                     } else {
-                        // 如果是答錯狀態 -> 解鎖重答
                         optsEl.classList.remove('locked');
                         const wrongBtns = optsEl.querySelectorAll('.wrong');
                         wrongBtns.forEach(b => b.disabled = true);
-                        feedbackEl.innerText = '💪 加油，再試一次！';
+                        feedbackEl.innerText = currentLang === 'zh' ? '💪 加油，再試一次！' : '💪 Try again!';
                         feedbackEl.style.color = '#555';
                         skipHint.style.display = 'none';
                     }
                 }
             };
+        }
+
+        // 渲染題目內容 (分離出來以便切換語言)
+        function renderQuizContent(square1, square2) {
+            const qData = questions[currentQuizIndex][currentLang];
+            const qTitle = document.getElementById('quiz-title');
+            const qEl = document.getElementById('quiz-question');
+            const optsEl = document.getElementById('quiz-options');
+            const feedbackEl = document.getElementById('quiz-feedback');
+            const explSection = document.getElementById('quiz-explanation');
+            const explTitle = document.getElementById('explanation-title');
+            const explText = document.getElementById('explanation-text');
+            const skipHint = document.getElementById('skip-hint');
+            const langBtn = document.getElementById('lang-btn');
+
+            // 更新 UI 文字
+            langBtn.innerText = currentLang === 'zh' ? 'ENG' : '中文';
+            qTitle.innerText = currentLang === 'zh' ? '考考你！' : 'Quiz Time!';
+            qEl.innerText = qData.question;
+            explTitle.innerText = currentLang === 'zh' ? '📖 科學小教室：' : '📖 Science Fact:';
+            explText.innerText = qData.explanation;
+
+            // 清空舊選項
+            optsEl.innerHTML = '';
+            
+            // 使用之前生成的隨機順序渲染選項
+            currentOptionsOrder.forEach(idx => {
+                const optText = qData.options[idx];
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = optText;
+                
+                // 點擊事件
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (btn.classList.contains('wrong') || btn.classList.contains('correct') || optsEl.classList.contains('locked')) return;
+
+                    const correctAnswer = qData.answer; // 當前語言的正確答案
+                    
+                    if (optText === correctAnswer) {
+                        // --- 答對 ---
+                        btn.classList.add('correct');
+                        feedbackEl.innerText = currentLang === 'zh' ? '✅ 太棒了！答對了！' : '✅ Correct! Great job!';
+                        feedbackEl.className = 'feedback-correct';
+                        
+                        totalQuestionsAnswered++;
+                        
+                        const allBtns = optsEl.querySelectorAll('button');
+                        allBtns.forEach(b => b.disabled = true);
+                        
+                        explSection.style.display = 'block';
+                        skipHint.style.display = 'block';
+                        skipHint.innerText = currentLang === 'zh' ? '⏳ 閱讀時間... (點擊任意處繼續)' : '⏳ Reading time... (Click anywhere to skip)';
+
+                        startHoldTimer(3000, () => {
+                            const modal = document.getElementById('quiz-modal');
+                            modal.classList.remove('active');
+                            handleCorrectAnswer();
+                        });
+                        
+                        // 播放正確音效或TTS (可選)
+                        speakText(currentLang === 'zh' ? '答對了' : 'Correct');
+
+                    } else {
+                        // --- 答錯 ---
+                        btn.classList.add('wrong');
+                        feedbackEl.innerText = currentLang === 'zh' ? '❌ 不對喔，先看看原理解說！' : '❌ Incorrect. Read the explanation!';
+                        feedbackEl.className = 'feedback-wrong';
+                        
+                        // 記錄中文題目作為錯題 (保持統一)
+                        const zhQ = questions[currentQuizIndex].zh;
+                        wrongQuestionsSet.add(zhQ.question + " (正解: " + zhQ.answer + ")");
+                        
+                        explSection.style.display = 'block';
+                        optsEl.classList.add('locked');
+                        skipHint.style.display = 'block';
+                        skipHint.innerText = currentLang === 'zh' ? '⏳ 請閱讀觀念... (3秒後可重答)' : '⏳ Please read... (Retry in 3s)';
+
+                        startHoldTimer(3000, () => {
+                            optsEl.classList.remove('locked');
+                            btn.disabled = true;
+                            feedbackEl.innerText = currentLang === 'zh' ? '💪 加油，再試一次！' : '💪 Try again!';
+                            feedbackEl.style.color = '#555';
+                            skipHint.style.display = 'none';
+                        });
+                        
+                         // 播放錯誤音效或TTS (可選)
+                         speakText(currentLang === 'zh' ? '再試一次' : 'Try again');
+                    }
+                };
+                optsEl.appendChild(btn);
+            });
+        }
+
+        // --- 語言切換與發音功能 ---
+
+        // 1. 切換語言
+        document.getElementById('lang-btn').addEventListener('click', (e) => {
+            e.stopPropagation(); // 防止觸發 modal 背景點擊
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            
+            // 重新渲染當前題目 (保留在 modal 中)
+            renderQuizContent(null, null);
+        });
+
+        // 2. 發音功能 (TTS) - 修正：直接讀取螢幕上的按鈕文字
+        document.getElementById('tts-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const qData = questions[currentQuizIndex][currentLang];
+            
+            // 先讀題目
+            let textToRead = qData.question + ". ";
+            
+            // 直接讀取目前已經渲染在螢幕上的按鈕 (確保順序一致)
+            const renderedBtns = document.querySelectorAll('#quiz-options .option-btn');
+            
+            renderedBtns.forEach((btn, index) => {
+                const optText = btn.innerText;
+                if (currentLang === 'zh') {
+                    textToRead += `選項 ${index + 1}: ${optText}。 `;
+                } else {
+                    textToRead += `Option ${index + 1}: ${optText}. `;
+                }
+            });
+
+            speakText(textToRead);
+        });
+
+        function speakText(text) {
+            // 停止當前發音
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // 設定語言
+            if (currentLang === 'zh') {
+                utterance.lang = 'zh-HK'; // 廣東話
+            } else {
+                utterance.lang = 'en-US'; // 英文
+            }
+
+            // 調整速率與音調
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+
+            window.speechSynthesis.speak(utterance);
         }
 
         function startHoldTimer(duration, callback) {
@@ -949,36 +1189,26 @@
             processMatchesAndRefill(true);
         }
 
-        // --- 6. 核心消除邏輯 ---
+        // --- 6. 核心消除與掉落邏輯 (保持不變) ---
         function checkForMatches(justCheck = false) {
             let hasMatch = false;
-
-            // Rows
             for (let i = 0; i < 64; i++) {
                 if (i % width > width - 3) continue;
                 let rowOfThree = [i, i + 1, i + 2];
                 let decidedType = squares[i].getAttribute('data-type');
                 const isBlank = squares[i].getAttribute('data-type') === '';
-
                 if (rowOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
                     hasMatch = true;
-                    if (!justCheck) {
-                        rowOfThree.forEach(index => squares[index].classList.add('matched'));
-                    }
+                    if (!justCheck) rowOfThree.forEach(index => squares[index].classList.add('matched'));
                 }
             }
-
-            // Columns
             for (let i = 0; i < 47; i++) {
                 let colOfThree = [i, i + width, i + width * 2];
                 let decidedType = squares[i].getAttribute('data-type');
                 const isBlank = squares[i].getAttribute('data-type') === '';
-
                 if (colOfThree.every(index => squares[index].getAttribute('data-type') === decidedType && !isBlank)) {
                     hasMatch = true;
-                    if (!justCheck) {
-                        colOfThree.forEach(index => squares[index].classList.add('matched'));
-                    }
+                    if (!justCheck) colOfThree.forEach(index => squares[index].classList.add('matched'));
                 }
             }
             return hasMatch;
@@ -987,25 +1217,18 @@
         function processMatchesAndRefill(isPlayerMove) {
             checkForMatches(false); 
             const matchedSquares = document.querySelectorAll('.matched');
-            
             if (matchedSquares.length > 0) {
                 const points = matchedSquares.length * 10;
                 score += points;
                 updateStats();
-
-                if (!isPlayerMove) {
-                    showCombo();
-                }
-
-                // 清除顯示
+                if (!isPlayerMove) showCombo();
                 matchedSquares.forEach(square => {
                     square.innerText = '';
                     square.setAttribute('data-type', '');
                     square.classList.remove('matched');
                 });
-
                 setTimeout(() => {
-                    moveDown(); // 這裡執行整欄重整
+                    moveDown();
                     setTimeout(() => {
                         if (checkForMatches(true)) {
                             processMatchesAndRefill(false);
@@ -1015,42 +1238,30 @@
                         }
                     }, 250);
                 }, 250);
-
             } else {
                 isProcessing = false;
                 checkGameOver();
             }
         }
 
-        // === 修正後的重力掉落邏輯 (整欄重整) ===
         function moveDown() {
-            for (let i = 0; i < width; i++) { // 對每一行 (Column)
+            for (let i = 0; i < width; i++) {
                 let columnValues = [];
-                // 1. 收集該行所有非空的糖果
                 for (let j = 0; j < width; j++) {
                     let index = j * width + i;
                     let type = squares[index].getAttribute('data-type');
-                    if (type !== '') {
-                        columnValues.push(type);
-                    }
+                    if (type !== '') columnValues.push(type);
                 }
-
-                // 2. 計算需要補多少個新糖果
                 let missingCount = width - columnValues.length;
-
-                // 3. 在頂部加入新糖果
                 for (let k = 0; k < missingCount; k++) {
                     let randomColor = Math.floor(Math.random() * candyColors.length);
                     columnValues.unshift(candyColors[randomColor]);
                 }
-
-                // 4. 將新的列表寫回格子
                 for (let j = 0; j < width; j++) {
                     let index = j * width + i;
                     let type = columnValues[j];
                     squares[index].setAttribute('data-type', type);
                     squares[index].innerText = type;
-                    // 確保沒有殘留的 class
                     squares[index].classList.remove('matched'); 
                 }
             }
@@ -1092,16 +1303,13 @@
             if (moves <= 0) {
                 document.getElementById('report-title').innerText = `${playerName} 的學習報告`;
                 document.getElementById('final-score').innerText = score;
-
                 let accuracy = 0;
                 if (totalQuestionsAnswered > 0) {
                     accuracy = Math.round((firstTryCorrectCount / totalQuestionsAnswered) * 100);
                 }
                 document.getElementById('final-accuracy').innerText = accuracy + "%";
-
                 const reviewList = document.getElementById('review-list');
                 reviewList.innerHTML = '';
-                
                 if (wrongQuestionsSet.size > 0) {
                     wrongQuestionsSet.forEach(item => {
                         const li = document.createElement('li');
@@ -1111,7 +1319,6 @@
                 } else {
                     reviewList.innerHTML = '<div style="text-align: center; color: #4CAF50;">🎉 太棒了！全部題目都一次答對！</div>';
                 }
-
                 document.getElementById('game-over-modal').classList.add('active');
             }
         }
